@@ -1,7 +1,8 @@
 const http = require('http')
 const { WebSocketServer } = require('ws')
 
-const url = require(`url`)
+const url = require(`url`);
+const { parse } = require('path');
 
 const port = 8000;
 
@@ -11,33 +12,36 @@ const wsServer = new WebSocketServer({ server })
 let messagesList = []
 let activeConnections = []
 
-wsServer.on(`connection`, (connection, request)=>{
-    const {username} = url.parse(request.url, true).query
-    const {birthdate} = url.parse(request.url, true).query
-
-    console.log(`Username ${username} birthday is on ${birthdate}`)
+wsServer.on(`connection`, (connection)=>{
     
-    // Adiciona a nova conexão à lista de conexões ativas
-    activeConnections.push(connection)
+    let username = '';  // Inicializa o username como vazio.
 
-    connection.on(`sendMessage`, message => {
+    connection.on('message', (message) => {
+        // Parse a mensagem e define o username se não estiver setado
+        const parsedMessage = JSON.parse(message);
+        console.log(parsedMessage);
+        if (!username && parsedMessage.username) {
+            username = parsedMessage.username; // Define o username
+        }
+
+        // Adiciona a mensagem à lista com o username
         messagesList.push({
-            message: message.message,
+            message: parsedMessage.message,
             username: username
         });
-        
         // Broadcast para todos os clientes conectados
         activeConnections.forEach(client => {
-            if (client.readyState === WebSocket.OPEN) {
-                client.send(JSON.stringify(messagesList))
+            if (client.connection.readyState === client.connection.OPEN) {
+                client.connection.send(JSON.stringify(messagesList));
             }
-        })
-    })
+        });
+    });
 
     // Remove a conexão quando o cliente desconecta
     connection.on('close', () => {
         activeConnections = activeConnections.filter(conn => conn !== connection)
     })
+    activeConnections.push({ connection, username });
 })
 
 server.listen(port, () => {
