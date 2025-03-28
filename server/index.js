@@ -4,14 +4,15 @@ const { initializeApp } = require('firebase/app');
 const { getFirestore, doc, setDoc, updateDoc, deleteDoc, Timestamp } = require('firebase/firestore');
 
 const firebaseConfig = {
-    apiKey: "AIzaSyCl94czceWcCF6NGeFFgSSLIrrBWK91oOs",
-    authDomain: "chat-project-e2537.firebaseapp.com",
-    projectId: "chat-project-e2537",
-    storageBucket: "chat-project-e2537.firebasestorage.app",
-    messagingSenderId: "660289624896",
-    appId: "1:660289624896:web:efc3291219dc363e48f8a5",
-    measurementId: "G-MVKK1T4K49"
+    apiKey: process.env.REACT_APP_API_KEY,
+    authDomain: process.env.REACT_APP_AUTH_DOMAIN,
+    projectId: process.env.REACT_APP_PROJECT_ID,
+    storageBucket: process.env.REACT_APP_STORAGE_BUCKET,
+    messagingSenderId: process.env.REACT_APP_MESSAGING_SENDER_ID,
+    appId: process.env.REACT_APP_APP_ID,
+    measurementId: process.env.REACT_APP_MEASUREMENT_ID,
   };
+  
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
