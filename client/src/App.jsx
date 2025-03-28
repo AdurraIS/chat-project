@@ -1,68 +1,59 @@
-import { useState, useEffect } from 'react'
-import './App.css'
-import useWebSocket from 'react-use-websocket'
+import React, { useState } from 'react';
+import ConnectForm from './Components/ConnectForm';
 
 function App() {
-  const [username, setUsername] = useState("")
-  const [usernameInput, setUsernameInput] = useState("")
-  const [messageInput, setMessageInput] = useState("")
-  const [messages, setMessages] = useState([])
-  const [isConnected, setIsConnected] = useState(false)
+  const [username, setUsername] = useState('');
+  const [userId, setUserId] = useState('user' + Date.now()); // Gera um userId único (você pode melhorar essa lógica)
+  const [isConnected, setIsConnected] = useState(false);
+  const [socket, setSocket] = useState(null); // Para armazenar a instância do WebSocket
 
-  const ws_url = "ws://localhost:8000"
-  const { sendMessage, lastMessage } = useWebSocket(ws_url, {
-    onMessage: (event) => {
-      const data = JSON.parse(event.data);
-      setMessages(data);
-    }
-  });
+  // Função que será chamada quando o usuário se conectar
+  const handleConnect = (username) => {
+    console.log(`Conectando o usuário: ${username} com userId: ${userId}`);
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    if (messageInput !== '' && usernameInput !== '') {
-      if (!isConnected) {
-        setIsConnected(true);
-      }
-      // Envia a mensagem normal
-      sendMessage(JSON.stringify({message:messageInput, username: usernameInput}));
-      
-    } else {
-      alert('Por favor, preencha seu nome de usuário e uma mensagem');
-    }
-  }
+    // Conectar ao WebSocket usando query parameters
+    const socketUrl = `ws://localhost:8000?username=${username}`;
+    const ws = new WebSocket(socketUrl);
+
+    // Salvar a instância do WebSocket
+    setSocket(ws);
+
+    // Configurar os eventos do WebSocket
+    ws.onopen = () => {
+      console.log('Conexão WebSocket estabelecida');
+      setIsConnected(true);
+    };
+
+    ws.onmessage = (event) => {
+      console.log('Mensagem recebida do servidor:', event.data);
+    };
+
+    ws.onclose = () => {
+      console.log('Conexão WebSocket fechada');
+      setIsConnected(false);
+    };
+
+    ws.onerror = (error) => {
+      console.error('Erro no WebSocket:', error);
+    };
+
+    // Armazenar o username e userId no estado
+    setUsername(username);
+  };
 
   return (
-    <div className="chat-container">
-      <div className="username-section">
-        <input
-          type="text"
-          placeholder="Digite seu nome de usuário"
-          value={usernameInput}
-          onChange={(e) => setUsernameInput(e.target.value)}
-          disabled={isConnected}
-        />
-      </div>
-
-      <div className="messages-container">
-        {messages.map((msg, index) => (
-          <div key={index} className="message">
-            <span className="username">{msg.username}: </span>
-            <span className="message-text">{msg.message}</span>
-          </div>
-        ))}
-      </div>
-
-      <form onSubmit={handleSubmit} className="message-form">
-        <input
-          type="text"
-          placeholder="Digite sua mensagem"
-          value={messageInput}
-          onChange={(e) => setMessageInput(e.target.value)}
-        />
-        <button type="submit">Enviar</button>
-      </form>
+    <div>
+      {!isConnected ? (
+        <ConnectForm onConnect={handleConnect} />
+      ) : (
+        <div>
+          <h1>Bem-vindo, {username}!</h1>
+          <p>Você está conectado com o WebSocket.</p>
+          {/* Exemplo de exibição de mensagens do WebSocket */}
+        </div>
+      )}
     </div>
-  )
+  );
 }
 
-export default App
+export default App;
