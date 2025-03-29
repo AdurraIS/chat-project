@@ -1,4 +1,4 @@
-const { getConnectedUsers, deleteDocFromConnection, persistConnection } = require('./firebase');
+const { getConnectedUsers, deleteDocFromConnection, persistConnection, getSocketIdByUsername, findSocketById } = require('./firebase');
 const http = require('http')
 const { WebSocketServer } = require('ws')
 const url = require(`url`);
@@ -12,10 +12,10 @@ let activeConnections = []
 
 wsServer.on(`connection`, (connection, request) => {
     const userId = 'user' + Date.now();
-    const socketId = connection._socket.remoteAddress + Date.now();
+    const socketId = 'socket' + Date.now();
     const { username } = url.parse(request.url, true).query;
-
-    persistConnection(userId, socketId);
+    connection.socketId = socketId;
+    persistConnection(userId, socketId, username);
 
     // Envia a nova conexão e lista de usuários para todos
     getConnectedUsers().then(connectedUsers => {
@@ -44,8 +44,8 @@ wsServer.on(`connection`, (connection, request) => {
 
                 if (socketId) {
                     // Encontra o socket do destinatário
-                    const receiverSocket = findSocketById(socketId);
-
+                    const receiverSocket = findSocketById(socketId, wsServer);
+                    console.log(receiverSocket);
                     if (receiverSocket) {
                         console.log("Enviado para " + messageData.to)
                         // Envia a mensagem privada

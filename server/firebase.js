@@ -55,9 +55,10 @@ const getSocketIdByUsername = async (username) => {
 };
 
 
-const findSocketById = (socketId) => {
+const findSocketById = (socketId, wsServer) => {
     for (let client of wsServer.clients) {
-        if (client._socket.remoteAddress + client._socket.localPort === socketId) {
+        // Se você está passando socketId como um valor único, compare diretamente
+        if (client.socketId === socketId) { // Assumindo que client.id seja o valor correto
             return client;
         }
     }
@@ -66,7 +67,7 @@ const findSocketById = (socketId) => {
 const deleteDocFromConnection = async (userId) => {
     await deleteDoc(doc(db, 'connections', userId));
 }
-const persistConnection = (userId, socketId) =>{
+const persistConnection = (userId, socketId, username) =>{
     const connectionRef = doc(db, 'connections', userId);
     setDoc(connectionRef, {
         socketId,
