@@ -1,72 +1,91 @@
+const { getConnectedUsers, deleteDocFromConnection, persistConnection } = require('./firebase');
 const http = require('http')
 const { WebSocketServer } = require('ws')
-const { initializeApp } = require('firebase/app');
-const { getFirestore, doc, setDoc, updateDoc, deleteDoc, Timestamp } = require('firebase/firestore');
-
-const firebaseConfig = {
-    apiKey: process.env.REACT_APP_API_KEY,
-    authDomain: process.env.REACT_APP_AUTH_DOMAIN,
-    projectId: process.env.REACT_APP_PROJECT_ID,
-    storageBucket: process.env.REACT_APP_STORAGE_BUCKET,
-    messagingSenderId: process.env.REACT_APP_MESSAGING_SENDER_ID,
-    appId: process.env.REACT_APP_APP_ID,
-    measurementId: process.env.REACT_APP_MEASUREMENT_ID,
-  };
-  
-
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
-
-
 const url = require(`url`);
-const { parse } = require('path');
 
 const port = 8000;
 
 const server = http.createServer()
 const wsServer = new WebSocketServer({ server })
 
-let messagesList = []
 let activeConnections = []
 
 wsServer.on(`connection`, (connection, request) => {
     const userId = 'user' + Date.now();
     const socketId = connection._socket.remoteAddress + Date.now();
-    const {username} = url.parse(request.url, true).query;
+    const { username } = url.parse(request.url, true).query;
 
-    const connectionRef = doc(db, 'connections', userId);
-    setDoc(connectionRef, {
-        socketId,
-        username,
-        status: 'online',
-        timestamp: Timestamp.now(),
+    persistConnection(userId, socketId);
+
+    // Envia a nova conexão e lista de usuários para todos
+    getConnectedUsers().then(connectedUsers => {
+        activeConnections.forEach(client => {
+            if (client.connection.readyState === client.connection.OPEN) {
+                client.connection.send(JSON.stringify({
+                    type: 'newConnection',
+                    connectedUsers: connectedUsers
+                }));
+            }
+        });
     });
 
     // Quando o WebSocket receber uma mensagem
     connection.on('message', async (message) => {
-        console.log('Mensagem recebida:', message);
+        try {
 
-        // Suponhamos que a mensagem tenha o formato: { receiverId, text }
-        const { receiverId, text } = JSON.parse(message);
+            const messageData = JSON.parse(message.toString());
 
-        // Enviar a mensagem para o destinatário com base no receiverId
-        const receiverSocketId = await getSocketIdByUserId(receiverId);
+            if (messageData.type === 'private') {
+                // Envia mensagem privada
 
-        if (receiverSocketId) {
-            // Encontrar o WebSocket do destinatário
-            const receiverSocket = findSocketById(receiverSocketId);
-            if (receiverSocket) {
-                // Enviar a mensagem ao destinatário
-                receiverSocket.send(JSON.stringify({ senderId: userId, text }));
-            } else {
-                console.log('Destinatário não conectado');
+                console.log("Mensagem recebida no server")
+                // Busca o socketId do destinatário no Firestore
+                const socketId = await getSocketIdByUsername(messageData.to);
+
+                if (socketId) {
+                    // Encontra o socket do destinatário
+                    const receiverSocket = findSocketById(socketId);
+
+                    if (receiverSocket) {
+                        console.log("Enviado para " + messageData.to)
+                        // Envia a mensagem privada
+                        receiverSocket.send(JSON.stringify({
+                            type: 'private',
+                            from: messageData.from,
+                            to: messageData.to,
+                            message: messageData.message,
+                            timestamp: messageData.timestamp
+                        }));
+
+                        connection.send(JSON.stringify({
+                            type: 'private',
+                            from: messageData.from,
+                            to: messageData.to,
+                            message: messageData.message,
+                            timestamp: messageData.timestamp
+                        }));
+                    }
+                }
+            } else if (messageData.type === 'public') {
+
+                // Broadcast para todos os clientes conectados mensagem publica
+                activeConnections.forEach(client => {
+                    if (client.connection.readyState === client.connection.OPEN) {
+                        client.connection.send(JSON.stringify({
+                            type: 'public',
+                            from: messageData.from,
+                            message: messageData.message,
+                            timestamp: messageData.timestamp
+                        }));
+                    }
+                });
             }
-        } else {
-            console.log('Usuário destinatário não encontrado');
+        } catch (error) {
+            console.error('Erro ao processar mensagem:', error);
         }
     });
     connection.on('close', async () => {
-        await deleteDoc(doc(db, 'connections', userId));
+        deleteDocFromConnection(userId);
     })
     activeConnections.push({ connection, username });
 })
@@ -74,25 +93,3 @@ wsServer.on(`connection`, (connection, request) => {
 server.listen(port, () => {
     console.log(`WebSocket server is running on port: ${port}`)
 })
-
-const getSocketIdByUserId = async (userId) => {
-    const connectionRef = doc(db, 'connections', userId);
-    const docSnap = await getDoc(connectionRef);
-    
-    if (docSnap.exists()) {
-      return docSnap.data().socketId;
-    } else {
-      console.log('Usuário não encontrado');
-      return null;
-    }
-  };
-
-const findSocketById = (socketId) => {
-    for (let client of wss.clients) {
-      if (client._socket.remoteAddress + client._socket.localPort === socketId) {
-        return client;
-      }
-    }
-    return null;
-  };
-  
