@@ -1,68 +1,96 @@
-import { useState, useEffect } from 'react'
-import './App.css'
-import useWebSocket from 'react-use-websocket'
+import React, { useState } from 'react';
+import ConnectForm from './Components/ConnectForm';
+import ConnectedUsers from './Components/ConnectedUsers';
+import IndividualChat from './Components/IndividualChat';
+import './App.css';
 
 function App() {
-  const [username, setUsername] = useState("")
-  const [usernameInput, setUsernameInput] = useState("")
-  const [messageInput, setMessageInput] = useState("")
-  const [messages, setMessages] = useState([])
-  const [isConnected, setIsConnected] = useState(false)
+  const [username, setUsername] = useState('');
+  const [userId, setUserId] = useState('user' + Date.now());
+  const [isConnected, setIsConnected] = useState(false);
+  const [socket, setSocket] = useState(null);
+  const [message, setMessage] = useState('');
+  const [messages, setMessages] = useState([]);
+  const [targetUsername, setTargetUsername] = useState("");
 
-  const ws_url = "ws://localhost:8000"
-  const { sendMessage, lastMessage } = useWebSocket(ws_url, {
-    onMessage: (event) => {
+  const handleConnect = (username) => {
+    console.log(`Conectando o usuário: ${username} com userId: ${userId}`);
+
+    const socketUrl = `ws://localhost:8000?username=${username}`;
+    const ws = new WebSocket(socketUrl);
+
+    setSocket(ws);
+
+    ws.onopen = () => {
+      console.log('Conexão WebSocket estabelecida');
+      setIsConnected(true);
+    };
+
+    ws.onmessage = (event) => {
       const data = JSON.parse(event.data);
       setMessages(data);
-    }
-  });
+      console.log('Mensagem recebida do servidor:', data);
+    };
+
+    ws.onclose = () => {
+      console.log('Conexão WebSocket fechada');
+      setIsConnected(false);
+    };
+
+    ws.onerror = (error) => {
+      console.error('Erro no WebSocket:', error);
+    };
+
+    setUsername(username);
+  };
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (messageInput !== '' && usernameInput !== '') {
-      if (!isConnected) {
-        setIsConnected(true);
-      }
-      // Envia a mensagem normal
-      sendMessage(JSON.stringify({message:messageInput, username: usernameInput}));
-      
-    } else {
-      alert('Por favor, preencha seu nome de usuário e uma mensagem');
+    if (message.trim() !== '' && socket && socket.readyState === WebSocket.OPEN) {
+      socket.send(message);
+      setMessage('');
     }
-  }
+  };
+
+  const handleSelectUser = (targetUser) => {
+    setTargetUsername(targetUser);
+
+  };
+
+  const handleCloseChat = () => {
+    setTargetUsername(null);
+  };
 
   return (
-    <div className="chat-container">
-      <div className="username-section">
-        <input
-          type="text"
-          placeholder="Digite seu nome de usuário"
-          value={usernameInput}
-          onChange={(e) => setUsernameInput(e.target.value)}
-          disabled={isConnected}
-        />
-      </div>
-
-      <div className="messages-container">
-        {messages.map((msg, index) => (
-          <div key={index} className="message">
-            <span className="username">{msg.username}: </span>
-            <span className="message-text">{msg.message}</span>
+    <div className="App">
+      {!isConnected ? (
+        <ConnectForm onConnect={handleConnect} />
+      ) : (
+        <div className="chat-container">
+          <div className="username-section">
+            <h1>Bem-vindo, {username}!</h1>
+            <ConnectedUsers
+              currentUser={username}
+              onSelectUser={handleSelectUser}
+              socket={socket}
+            />
           </div>
-        ))}
-      </div>
 
-      <form onSubmit={handleSubmit} className="message-form">
-        <input
-          type="text"
-          placeholder="Digite sua mensagem"
-          value={messageInput}
-          onChange={(e) => setMessageInput(e.target.value)}
-        />
-        <button type="submit">Enviar</button>
-      </form>
+          {/* Chats individuais */}
+          {targetUsername ? (
+            <IndividualChat
+              key={targetUsername}
+              targetUser={targetUsername}
+              currentUser={username}
+              socket={socket}
+              onClose={handleCloseChat} // Isso já passa a função diretamente
+            />
+          ) : null}  {/* Caso targetSocketId seja falso, nada será renderizado */}
+
+        </div>
+      )}
     </div>
-  )
+  );
 }
 
-export default App
+export default App;
