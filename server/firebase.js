@@ -3,9 +3,6 @@ require('dotenv').config();
 const { initializeApp } = require('firebase/app');
 const { getFirestore, doc, where, setDoc, query, deleteDoc, Timestamp, collection, getDocs } = require('firebase/firestore');
 
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
-
 const firebaseConfig = {
     apiKey: process.env.REACT_APP_API_KEY,
     authDomain: process.env.REACT_APP_AUTH_DOMAIN,
@@ -16,8 +13,13 @@ const firebaseConfig = {
     measurementId: process.env.REACT_APP_MEASUREMENT_ID,
 };
 
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+
+
 // Busca todos os usuários conectados no Firestore
-export const getConnectedUsers = async () => {
+const getConnectedUsers = async () => {
     const connectionsRef = collection(db, 'connections');
     const querySnapshot = await getDocs(connectionsRef);
     const connectedUsers = [];
@@ -31,7 +33,7 @@ export const getConnectedUsers = async () => {
     return connectedUsers;
 };
 
-export const getSocketIdByUsername = async (username) => {
+const getSocketIdByUsername = async (username) => {
     try {
         // Consulta a coleção de conexões procurando pelo username
         const connectionsRef = collection(db, 'connections');
@@ -53,7 +55,7 @@ export const getSocketIdByUsername = async (username) => {
 };
 
 
-export const findSocketById = (socketId) => {
+const findSocketById = (socketId) => {
     for (let client of wsServer.clients) {
         if (client._socket.remoteAddress + client._socket.localPort === socketId) {
             return client;
@@ -61,10 +63,10 @@ export const findSocketById = (socketId) => {
     }
     return null;
 };
-export const deleteDocFromConnection = async (userId) => {
+const deleteDocFromConnection = async (userId) => {
     await deleteDoc(doc(db, 'connections', userId));
 }
-export const persistConnection = (userId, socketId) =>{
+const persistConnection = (userId, socketId) =>{
     const connectionRef = doc(db, 'connections', userId);
     setDoc(connectionRef, {
         socketId,
@@ -73,3 +75,11 @@ export const persistConnection = (userId, socketId) =>{
         timestamp: Timestamp.now(),
     });
 }
+
+module.exports = {
+    getConnectedUsers,
+    getSocketIdByUsername,
+    findSocketById,
+    deleteDocFromConnection,
+    persistConnection,
+};

@@ -64,6 +64,8 @@ wsServer.on(`connection`, (connection, request) => {
                             message: messageData.message,
                             timestamp: messageData.timestamp
                         }));
+
+                        console.log("Mensagem enviada para os destinatarios")
                     }
                 }
             } else if (messageData.type === 'public') {
